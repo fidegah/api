@@ -1,0 +1,1 @@
+export const MAX_ROADMAPS_PER_WORKSPACE = 10;
