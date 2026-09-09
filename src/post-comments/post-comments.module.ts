@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { PostCommentsService } from './post-comments.service';
 import { PostCommentsController } from './post-comments.controller';
 import { PostCommentsApiKeyController } from './post-comments-api-key.controller';
@@ -11,12 +11,7 @@ import { PostCommentsPortalController } from './post-comments-portal.controller'
 import { PostCommentsSdkController } from './post-comments-sdk.controller';
 
 @Module({
-  imports: [
-    forwardRef(() => AiModule),
-    WorkspacesModule,
-    NotificationsModule,
-    PortalModule,
-  ],
+  imports: [AiModule, WorkspacesModule, NotificationsModule, PortalModule],
   controllers: [
     PostCommentsController,
     PostCommentsApiKeyController,

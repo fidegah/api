@@ -13,9 +13,9 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 
+import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from './types/auth-user.type';
-import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { avatarMulterOptions } from './config/avatar-multer.config';
 
