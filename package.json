@@ -102,6 +102,16 @@
     "typescript": "^6.0.0",
     "typescript-eslint": "^8.20.0"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@scarf/scarf",
+      "@swc/core",
+      "bcrypt",
+      "esbuild",
+      "msgpackr-extract",
+      "unrs-resolver"
+    ]
+  },
   "jest": {
     "moduleFileExtensions": [
       "js",
