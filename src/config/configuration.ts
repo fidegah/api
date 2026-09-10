@@ -14,7 +14,7 @@ export default () => ({
     port: process.env.MAIL_PORT,
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASS,
-    form: process.env.MAIL_FROM,
+    from: process.env.MAIL_FROM,
   },
   otp: {
     secret: process.env.OTP_SECRET,

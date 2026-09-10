@@ -16,13 +16,14 @@ import { MailProcessor } from './mail.processor';
         transport: {
           host: config.get<string>('mail.host'),
           port: config.get<number>('mail.port'),
+          secure: config.get<number>('mail.port') === 465,
           auth: {
             user: config.get<string>('mail.user'),
             pass: config.get<string>('mail.pass'),
           },
         },
         defaults: {
-          from: config.get<string>('mail.form'),
+          from: config.get<string>('mail.from'),
         },
         template: {
           dir: join(process.cwd(), 'src/mail/templates'),
