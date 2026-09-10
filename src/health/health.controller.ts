@@ -8,6 +8,7 @@ import {
 import { DrizzleHealthIndicator } from './indicators/drizzle.health';
 import { RedisHealthIndicator } from './indicators/redis.health';
 import { StorageHealthIndicator } from './indicators/storage.health';
+import { MailHealthIndicator } from './indicators/mail.health';
 
 @Controller('health')
 export class HealthController {
@@ -16,6 +17,7 @@ export class HealthController {
     private readonly drizzleHealth: DrizzleHealthIndicator,
     private readonly redisHealth: RedisHealthIndicator,
     private readonly storageHealth: StorageHealthIndicator,
+    private readonly mailHealth: MailHealthIndicator,
     private readonly memory: MemoryHealthIndicator,
     private readonly disk: DiskHealthIndicator,
   ) {}
@@ -36,6 +38,7 @@ export class HealthController {
       () => this.drizzleHealth.isHealthy('database'),
       () => this.redisHealth.isHealthy('redis'),
       () => this.storageHealth.isHealthy('storage'),
+      () => this.mailHealth.isHealthy('mail'),
       () =>
         this.disk.checkStorage('disk', {
           path: '/',

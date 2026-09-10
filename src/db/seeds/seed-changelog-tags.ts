@@ -1,11 +1,7 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
 import { changelogTags } from '../schema';
+import { SeedDatabase } from './index';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const db = drizzle(pool);
-
-export async function seedChangelogTags() {
+export async function seedChangelogTags(db: SeedDatabase): Promise<void> {
   await db
     .insert(changelogTags)
     .values([
@@ -67,6 +63,4 @@ export async function seedChangelogTags() {
       },
     ])
     .onConflictDoNothing();
-
-  console.log('Changelog tags seeded successfully');
 }
