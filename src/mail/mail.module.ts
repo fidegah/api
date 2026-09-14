@@ -36,6 +36,10 @@ import { MailProcessor } from './mail.processor';
     }),
     BullModule.registerQueue({
       name: 'mail',
+      defaultJobOptions: {
+        removeOnComplete: true,
+        removeOnFail: 100,
+      },
     }),
   ],
   providers: [MailService, MailProcessor],

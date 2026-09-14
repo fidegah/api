@@ -5,9 +5,10 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { MailJobData } from './mail.types';
 import { ConfigService } from '@nestjs/config';
 
-@Processor('mail')
+@Processor('mail', { drainDelay: 30, stalledInterval: 300000 })
 export class MailProcessor extends WorkerHost {
   private readonly logger = new Logger(MailProcessor.name);
+  private readonly isDevelopment: boolean;
   private readonly siteUrl: string;
 
   constructor(
@@ -15,11 +16,20 @@ export class MailProcessor extends WorkerHost {
     private readonly configService: ConfigService,
   ) {
     super();
+    this.isDevelopment =
+      this.configService.get<string>('NODE_ENV') === 'development';
     this.siteUrl = `https://${this.configService.getOrThrow('app.domain')}`;
   }
 
   async process(job: Job<MailJobData>): Promise<void> {
     const { type, data } = job.data;
+
+    if (this.isDevelopment) {
+      this.logger.log(
+        `[DEV MAIL LOG] Job: ${type} | Payload: ${JSON.stringify(data)}`,
+      );
+      return;
+    }
 
     switch (type) {
       case 'email-verification': {
