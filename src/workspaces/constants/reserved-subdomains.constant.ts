@@ -146,8 +146,6 @@ export const RESERVED_SUBDOMAINS: ReadonlySet<string> = new Set([
   'roadmap',
   'roadmaps',
 
-  'fidegah',
-
   'email',
   'bounce',
   'bounces',
