@@ -25,6 +25,8 @@ export const RESERVED_SUBDOMAINS: ReadonlySet<string> = new Set([
   'localhost',
   'test',
 
+  'fidegah',
+
   'ns',
   'ns1',
   'ns2',
@@ -139,7 +141,6 @@ export const RESERVED_SUBDOMAINS: ReadonlySet<string> = new Set([
   'kibana',
   'prometheus',
 
-  'feedback',
   'changelog',
   'changelogs',
   'polls',
