@@ -46,6 +46,16 @@ export class PostsPortalController {
     return this.postsService.create(workspace.id, user.id, createPostDto);
   }
 
+  @Post(':id/vote')
+  @RequirePortalAuth()
+  toggleVote(
+    @CurrentPortalWorkspace() workspace: Workspace,
+    @CurrentPortalUser() userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.postVotesService.toggleVote(id, userId, workspace.id);
+  }
+
   @Get()
   findAll(
     @CurrentPortalWorkspace() workspace: Workspace,
@@ -53,15 +63,6 @@ export class PostsPortalController {
     @Query() query: QueryPostsDto,
   ) {
     return this.postsService.findAllPublic(workspace.id, userId, query);
-  }
-
-  @Get(':id')
-  findOne(
-    @CurrentPortalWorkspace() workspace: Workspace,
-    @OptionalPortalUser() userId: string | null,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    return this.postsService.findOnePublic(id, workspace.id, userId);
   }
 
   @Get(':id/voters')
@@ -77,13 +78,12 @@ export class PostsPortalController {
     );
   }
 
-  @Post(':id/vote')
-  @RequirePortalAuth()
-  toggleVote(
+  @Get(':id')
+  findOne(
     @CurrentPortalWorkspace() workspace: Workspace,
-    @CurrentPortalUser() userId: string,
+    @OptionalPortalUser() userId: string | null,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.postVotesService.toggleVote(id, userId, workspace.id);
+    return this.postsService.findOnePublic(id, workspace.id, userId);
   }
 }

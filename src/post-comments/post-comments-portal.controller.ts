@@ -53,6 +53,16 @@ export class PostCommentsPortalController {
     );
   }
 
+  @Post('comments/:commentId/like')
+  @RequirePortalAuth()
+  toggleLike(
+    @CurrentPortalWorkspace() workspace: Workspace,
+    @CurrentPortalUser() userId: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
+  ) {
+    return this.commentLikesService.toggleLike(commentId, workspace.id, userId);
+  }
+
   @Get(':postId/comments')
   findAllByPost(
     @CurrentPortalWorkspace() workspace: Workspace,
@@ -111,14 +121,5 @@ export class PostCommentsPortalController {
       workspace.id,
       userId,
     );
-  }
-
-  @Post('comments/:commentId/like')
-  @RequirePortalAuth()
-  toggleLike(
-    @CurrentPortalUser() userId: string,
-    @Param('commentId', ParseUUIDPipe) commentId: string,
-  ) {
-    return this.commentLikesService.toggleLike(commentId, userId);
   }
 }

@@ -1,13 +1,10 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { Request } from 'express';
+import { SdkSessionRequest } from '../interfaces/sdk-request.interface';
 
 export const SdkExternalUserId = createParamDecorator(
-  (_data: never, ctx: ExecutionContext): string | null => {
-    const request = ctx.switchToHttp().getRequest<Request>();
-    const sessionId = request.headers['x-sdk-session-id'];
+  (_data: unknown, ctx: ExecutionContext): string | null => {
+    const request = ctx.switchToHttp().getRequest<Partial<SdkSessionRequest>>();
 
-    if (!sessionId) return null;
-
-    return Array.isArray(sessionId) ? sessionId[0] : sessionId;
+    return request.sdkSession?.externalUserId ?? null;
   },
 );

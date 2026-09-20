@@ -7,57 +7,47 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Req,
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
 
-import type { Request } from 'express';
-
+import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RequireRole } from '../common/decorators/require-role.decorator';
+import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
 import { BoardsService } from './boards.service';
 import { CreateBoardDto } from './dto/create-board.dto';
 import { UpdateBoardDto } from './dto/update-board.dto';
-
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedUser } from '../users/types/auth-user.type';
-import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
-import { RequireRole } from '../common/decorators/require-role.decorator';
 
 @Controller({
   path: 'workspaces/:workspaceId/boards',
   version: VERSION_NEUTRAL,
 })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, WorkspaceRoleGuard)
 export class BoardsController {
   constructor(private readonly boardsService: BoardsService) {}
 
   @Post()
-  @UseGuards(WorkspaceRoleGuard)
-  async create(
+  create(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
-    @Req() req: Request,
     @Body() createBoardDto: CreateBoardDto,
   ) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.boardsService.create(workspaceId, user.id, createBoardDto);
+    return this.boardsService.create(workspaceId, userId, createBoardDto);
   }
 
   @Get()
-  @UseGuards(WorkspaceRoleGuard)
-  async findAll(@Param('workspaceId', ParseUUIDPipe) workspaceId: string) {
+  findAll(@Param('workspaceId', ParseUUIDPipe) workspaceId: string) {
     return this.boardsService.findAllByWorkspace(workspaceId);
   }
 
   @Get('default')
-  @UseGuards(WorkspaceRoleGuard)
   findDefault(@Param('workspaceId', ParseUUIDPipe) workspaceId: string) {
     return this.boardsService.findDefault(workspaceId);
   }
 
   @Get(':id')
-  @UseGuards(WorkspaceRoleGuard)
-  async findOne(
+  findOne(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
@@ -65,7 +55,6 @@ export class BoardsController {
   }
 
   @Patch(':id/set-default')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
   setDefault(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
@@ -75,9 +64,8 @@ export class BoardsController {
   }
 
   @Patch(':id')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async update(
+  update(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateBoardDto: UpdateBoardDto,
@@ -86,9 +74,8 @@ export class BoardsController {
   }
 
   @Delete(':id')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async remove(
+  remove(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {

@@ -8,10 +8,10 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
-import { BoardsService } from './boards.service';
-import { PortalWorkspaceGuard } from '../portal/guards/portal-workspace.guard';
-import { CurrentPortalWorkspace } from '../portal/decorators/portal-data.decorator';
 import type { Workspace } from '../db/schema';
+import { CurrentPortalWorkspace } from '../portal/decorators/portal-data.decorator';
+import { PortalWorkspaceGuard } from '../portal/guards/portal-workspace.guard';
+import { BoardsService } from './boards.service';
 
 @Controller({ path: 'portal/boards', version: VERSION_NEUTRAL })
 @UseGuards(PortalWorkspaceGuard)

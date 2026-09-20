@@ -4,7 +4,6 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
-  Req,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -12,26 +11,24 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
-import type { Request } from 'express';
 
+import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedUser } from '../users/types/auth-user.type';
-import { TicketsService } from './tickets.service';
-import { CreateTicketDto } from './dto/create-ticket.dto';
+import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
 import { ticketAttachmentsMulterOptions } from './config/multer.config';
 import { MAX_TICKET_ATTACHMENTS } from './constants/ticket-attachment.constant';
-import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
+import { CreateTicketDto } from './dto/create-ticket.dto';
+import { TicketsService } from './tickets.service';
 
 @Controller({
   path: 'workspaces/:workspaceId/tickets',
   version: VERSION_NEUTRAL,
 })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, WorkspaceRoleGuard)
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
   @Post()
-  @UseGuards(WorkspaceRoleGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @UseInterceptors(
     FilesInterceptor(
@@ -40,16 +37,15 @@ export class TicketsController {
       ticketAttachmentsMulterOptions,
     ),
   )
-  async create(
+  create(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Body() createTicketDto: CreateTicketDto,
-    @UploadedFiles() files: Express.Multer.File[] = [],
-    @Req() req: Request,
+    @UploadedFiles() files: Array<Express.Multer.File> = [],
   ) {
-    const user = req.user as AuthenticatedUser;
     return this.ticketsService.create(
       workspaceId,
-      user.id,
+      userId,
       createTicketDto,
       files,
     );

@@ -44,6 +44,15 @@ export class PostCommentsApiKeyController {
     );
   }
 
+  @Post(':id/like')
+  toggleLike(
+    @CurrentWorkspace() workspace: schema.Workspace,
+    @CurrentApiKeyUser() userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.commentLikesService.toggleLike(id, workspace.id, userId);
+  }
+
   @Get()
   findAll(
     @CurrentWorkspace() workspace: schema.Workspace,
@@ -95,13 +104,5 @@ export class PostCommentsApiKeyController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.postCommentsService.remove(id, workspace.id);
-  }
-
-  @Post(':id/like')
-  toggleLike(
-    @CurrentApiKeyUser() userId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    return this.commentLikesService.toggleLike(id, userId);
   }
 }

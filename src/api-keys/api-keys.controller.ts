@@ -7,50 +7,41 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 
-import type { Request } from 'express';
-
+import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedUser } from '../users/types/auth-user.type';
-import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
 import { RequireRole } from '../common/decorators/require-role.decorator';
-
+import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
 import { ApiKeysService } from './api-keys.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { UpdateApiKeyDto } from './dto/update-api-key.dto';
 
 @Controller('workspaces/:workspaceId/api-keys')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, WorkspaceRoleGuard)
 export class ApiKeysController {
   constructor(private readonly apiKeysService: ApiKeysService) {}
 
   @Post()
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async create(
+  create(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Body() createApiKeyDto: CreateApiKeyDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.apiKeysService.create(user.id, workspaceId, createApiKeyDto);
+    return this.apiKeysService.create(userId, workspaceId, createApiKeyDto);
   }
 
   @Get()
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async findAll(@Param('workspaceId', ParseUUIDPipe) workspaceId: string) {
+  findAll(@Param('workspaceId', ParseUUIDPipe) workspaceId: string) {
     return this.apiKeysService.findAll(workspaceId);
   }
 
   @Get(':id')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async findOne(
+  findOne(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
@@ -58,9 +49,8 @@ export class ApiKeysController {
   }
 
   @Patch(':id')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async update(
+  update(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateApiKeyDto: UpdateApiKeyDto,
@@ -69,9 +59,8 @@ export class ApiKeysController {
   }
 
   @Delete(':id')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async revoke(
+  revoke(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {

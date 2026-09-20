@@ -3,7 +3,6 @@ import {
   HttpStatus,
   Inject,
   Injectable,
-  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -30,7 +29,6 @@ import { AuthErrorCode } from './constants/auth-error-codes.constant';
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
   private readonly accessTokenExpiresIn = '15m';
   private readonly refreshTokenExpiresIn = '30d';
   private readonly refreshTokenTtl = 30 * 24 * 60 * 60;
@@ -292,14 +290,7 @@ export class AuthService {
 
     await this.redis.set(`otp:${normalizedEmail}`, otpHash, 'EX', 120);
 
-    const isDevelopment =
-      this.configService.get<string>('NODE_ENV') === 'development';
-
-    if (isDevelopment) {
-      this.logger.log(`[DEV OTP] Code for ${normalizedEmail}: ${code}`);
-    } else {
-      await this.mailService.sendOtp(normalizedEmail, code);
-    }
+    await this.mailService.sendOtp(normalizedEmail, code);
 
     return {
       message: 'OTP sent successfully',

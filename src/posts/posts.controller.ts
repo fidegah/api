@@ -8,30 +8,26 @@ import {
   Patch,
   Post,
   Query,
-  Req,
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
 
-import type { Request } from 'express';
-
+import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedUser } from '../users/types/auth-user.type';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
-
-import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
-import { UpdatePostDto } from './dto/update-post.dto';
 import { QueryPostsDto } from './dto/query-posts.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
 import { PostTagsService } from './post-tags.service';
 import { PostVotesService } from './post-votes.service';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { PostsService } from './posts.service';
 
 @Controller({
   path: 'workspaces/:workspaceId/posts',
   version: VERSION_NEUTRAL,
 })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, WorkspaceRoleGuard)
 export class PostsController {
   constructor(
     private readonly postsService: PostsService,
@@ -40,62 +36,24 @@ export class PostsController {
   ) {}
 
   @Post()
-  @UseGuards(WorkspaceRoleGuard)
-  async create(
+  create(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Body() createPostDto: CreatePostDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.postsService.create(workspaceId, user.id, createPostDto);
+    return this.postsService.create(workspaceId, userId, createPostDto);
   }
 
   @Get()
-  @UseGuards(WorkspaceRoleGuard)
-  async findAll(
+  findAll(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Query() query: QueryPostsDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.postsService.findAll(workspaceId, user.id, query);
-  }
-
-  @Get(':id')
-  @UseGuards(WorkspaceRoleGuard)
-  async findOne(
-    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request,
-  ) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.postsService.findOne(id, workspaceId, user.id);
-  }
-
-  @Patch(':id')
-  @UseGuards(WorkspaceRoleGuard)
-  async update(
-    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updatePostDto: UpdatePostDto,
-  ) {
-    return this.postsService.update(id, workspaceId, updatePostDto);
-  }
-
-  @Delete(':id')
-  @UseGuards(WorkspaceRoleGuard)
-  async remove(
-    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    return this.postsService.remove(id, workspaceId);
+    return this.postsService.findAll(workspaceId, userId, query);
   }
 
   @Get(':id/tags')
-  @UseGuards(WorkspaceRoleGuard)
   findTags(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -103,28 +61,7 @@ export class PostsController {
     return this.postTagsService.findTagsByPost(id, workspaceId);
   }
 
-  @Post(':id/tags/:tagId')
-  @UseGuards(WorkspaceRoleGuard)
-  async addTag(
-    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
-    @Param('id', ParseUUIDPipe) postId: string,
-    @Param('tagId', ParseUUIDPipe) tagId: string,
-  ) {
-    return this.postTagsService.addTagToPost(postId, tagId, workspaceId);
-  }
-
-  @Delete(':id/tags/:tagId')
-  @UseGuards(WorkspaceRoleGuard)
-  async removeTag(
-    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
-    @Param('id', ParseUUIDPipe) postId: string,
-    @Param('tagId', ParseUUIDPipe) tagId: string,
-  ) {
-    return this.postTagsService.removeTagFromPost(postId, tagId, workspaceId);
-  }
-
   @Get(':id/voters')
-  @UseGuards(WorkspaceRoleGuard)
   findVoters(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -137,15 +74,56 @@ export class PostsController {
     );
   }
 
-  @Post(':id/vote')
-  @UseGuards(WorkspaceRoleGuard)
-  async toggleVote(
+  @Get(':id')
+  findOne(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
+    return this.postsService.findOne(id, workspaceId, userId);
+  }
 
-    return this.postVotesService.toggleVote(id, user.id, workspaceId);
+  @Patch(':id')
+  update(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updatePostDto: UpdatePostDto,
+  ) {
+    return this.postsService.update(id, workspaceId, updatePostDto);
+  }
+
+  @Delete(':id')
+  remove(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.postsService.remove(id, workspaceId);
+  }
+
+  @Post(':id/vote')
+  toggleVote(
+    @CurrentUserId() userId: string,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.postVotesService.toggleVote(id, userId, workspaceId);
+  }
+
+  @Post(':id/tags/:tagId')
+  addTag(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) postId: string,
+    @Param('tagId', ParseUUIDPipe) tagId: string,
+  ) {
+    return this.postTagsService.addTagToPost(postId, tagId, workspaceId);
+  }
+
+  @Delete(':id/tags/:tagId')
+  removeTag(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) postId: string,
+    @Param('tagId', ParseUUIDPipe) tagId: string,
+  ) {
+    return this.postTagsService.removeTagFromPost(postId, tagId, workspaceId);
   }
 }

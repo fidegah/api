@@ -1,23 +1,21 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
+  Delete,
   Get,
   Patch,
-  Delete,
-  Body,
+  UploadedFile,
   UseGuards,
   UseInterceptors,
-  UploadedFile,
-  Req,
-  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Request } from 'express';
 
-import { UsersService } from './users.service';
+import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedUser } from './types/auth-user.type';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { avatarMulterOptions } from './config/avatar-multer.config';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UsersService } from './users.service';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -25,34 +23,33 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get('me')
-  getMe(@Req() req: Request) {
-    const user = req.user as AuthenticatedUser;
-    return this.usersService.findById(user.id);
+  getMe(@CurrentUserId() userId: string) {
+    return this.usersService.findById(userId);
   }
 
   @Patch('me')
-  updateMe(@Body() updateUserDto: UpdateUserDto, @Req() req: Request) {
-    const user = req.user as AuthenticatedUser;
-    return this.usersService.update(user.id, updateUserDto);
+  updateMe(
+    @CurrentUserId() userId: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return this.usersService.update(userId, updateUserDto);
   }
 
   @Patch('me/avatar')
   @UseInterceptors(FileInterceptor('avatar', avatarMulterOptions))
-  async updateAvatar(
-    @UploadedFile() file: Express.Multer.File,
-    @Req() req: Request,
+  updateAvatar(
+    @CurrentUserId() userId: string,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
     if (!file) {
       throw new BadRequestException('Avatar file is required');
     }
 
-    const user = req.user as AuthenticatedUser;
-    return this.usersService.updateAvatar(user.id, file);
+    return this.usersService.updateAvatar(userId, file);
   }
 
   @Delete('me')
-  removeMe(@Req() req: Request) {
-    const user = req.user as AuthenticatedUser;
-    return this.usersService.remove(user.id);
+  removeMe(@CurrentUserId() userId: string) {
+    return this.usersService.remove(userId);
   }
 }

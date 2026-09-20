@@ -6,7 +6,6 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
-  UnauthorizedException,
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
@@ -15,17 +14,18 @@ import { Throttle } from '@nestjs/throttler';
 import type { Workspace } from '../db/schema';
 import { CurrentSdkWorkspace } from '../sdk/decorators/sdk-workspace.decorator';
 import { SdkExternalUserId } from '../sdk/decorators/sdk-external-user.decorator';
-import { SdkGuard } from '../sdk/guards/sdk.guard';
-
+import { SdkWorkspaceGuard } from '../sdk/guards/sdk-workspace.guard';
+import { SdkSessionGuard } from '../sdk/guards/sdk-session.guard';
 import { PostsService } from './posts.service';
 import { PostVotesService } from './post-votes.service';
 import { PostTagsService } from './post-tags.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { QueryPostsDto } from './dto/query-posts.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { OptionalSdkSessionGuard } from '../sdk/guards/optional-sdk.session.guard';
 
 @Controller({ path: 'sdk/posts', version: VERSION_NEUTRAL })
-@UseGuards(SdkGuard)
+@UseGuards(SdkWorkspaceGuard)
 @Throttle({ default: { limit: 60, ttl: 60_000 } })
 export class PostsSdkController {
   constructor(
@@ -35,16 +35,12 @@ export class PostsSdkController {
   ) {}
 
   @Post()
+  @UseGuards(SdkSessionGuard)
   create(
     @CurrentSdkWorkspace() workspace: Workspace,
-    @SdkExternalUserId() externalUserId: string | null,
+    @SdkExternalUserId() externalUserId: string,
     @Body() createPostDto: CreatePostDto,
   ) {
-    if (!externalUserId) {
-      throw new UnauthorizedException(
-        'Session ID is required to create a post',
-      );
-    }
     return this.postsService.createSdk(
       workspace.id,
       externalUserId,
@@ -52,7 +48,22 @@ export class PostsSdkController {
     );
   }
 
+  @Post(':id/vote')
+  @UseGuards(SdkSessionGuard)
+  toggleVote(
+    @CurrentSdkWorkspace() workspace: Workspace,
+    @SdkExternalUserId() externalUserId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.postVotesService.toggleVoteSdk(
+      id,
+      externalUserId,
+      workspace.id,
+    );
+  }
+
   @Get()
+  @UseGuards(OptionalSdkSessionGuard)
   findAll(
     @CurrentSdkWorkspace() workspace: Workspace,
     @SdkExternalUserId() externalUserId: string | null,
@@ -65,49 +76,36 @@ export class PostsSdkController {
     );
   }
 
-  @Get(':id')
-  findOne(
+  @Get(':id/tags')
+  async findTags(
     @CurrentSdkWorkspace() workspace: Workspace,
-    @SdkExternalUserId() externalUserId: string | null,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.postsService.findOne(id, workspace.id, null, externalUserId);
-  }
-
-  @Post(':id/vote')
-  toggleVote(
-    @CurrentSdkWorkspace() workspace: Workspace,
-    @SdkExternalUserId() externalUserId: string | null,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    if (!externalUserId) {
-      throw new UnauthorizedException('Session ID is required to vote');
-    }
-    return this.postVotesService.toggleVoteSdk(
-      id,
-      externalUserId,
-      workspace.id,
-    );
+    await this.postsService.findOneSdkPublic(id, workspace.id, null);
+    return this.postTagsService.findTagsByPost(id, workspace.id);
   }
 
   @Get(':id/voters')
+  @UseGuards(OptionalSdkSessionGuard)
   findVoters(
     @CurrentSdkWorkspace() workspace: Workspace,
     @Param('id', ParseUUIDPipe) id: string,
     @Query() paginationQuery: PaginationQueryDto,
   ) {
-    return this.postVotesService.findVotersByPost(
+    return this.postVotesService.findVotersByPostSdk(
       id,
       workspace.id,
       paginationQuery,
     );
   }
 
-  @Get(':id/tags')
-  findTags(
+  @Get(':id')
+  @UseGuards(OptionalSdkSessionGuard)
+  findOne(
     @CurrentSdkWorkspace() workspace: Workspace,
+    @SdkExternalUserId() externalUserId: string | null,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.postTagsService.findTagsByPost(id, workspace.id);
+    return this.postsService.findOneSdkPublic(id, workspace.id, externalUserId);
   }
 }

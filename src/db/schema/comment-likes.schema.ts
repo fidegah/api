@@ -26,7 +26,7 @@ export const commentLikes = pgTable(
       () => externalUsers.id,
       { onDelete: 'cascade' },
     ),
-    sessionId: text('session_id'),
+    sessionId: text('sessionId'),
   },
   (table) => [
     uniqueIndex('unique_comment_user_like').on(table.commentId, table.userId),

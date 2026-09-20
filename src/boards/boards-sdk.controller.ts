@@ -9,12 +9,12 @@ import {
 import { Throttle } from '@nestjs/throttler';
 
 import type { Workspace } from '../db/schema';
-import { CurrentSdkWorkspace } from '../sdk/decorators/sdk-workspace.decorator';
-import { SdkGuard } from '../sdk/guards/sdk.guard';
 import { BoardsService } from './boards.service';
+import { CurrentSdkWorkspace } from '../sdk/decorators/sdk-workspace.decorator';
+import { SdkWorkspaceGuard } from '../sdk/guards/sdk-workspace.guard';
 
 @Controller({ path: 'sdk/boards', version: VERSION_NEUTRAL })
-@UseGuards(SdkGuard)
+@UseGuards(SdkWorkspaceGuard)
 @Throttle({ default: { limit: 60, ttl: 60_000 } })
 export class BoardsSdkController {
   constructor(private readonly boardsService: BoardsService) {}

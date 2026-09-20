@@ -28,6 +28,20 @@ import { UpdateRoadmapItemDto } from './dto/update-roadmap-item.dto';
 export class RoadmapItemsController {
   constructor(private readonly roadmapItemsService: RoadmapItemsService) {}
 
+  @Post('roadmaps/:roadmapId/items')
+  @UseGuards(WorkspaceRoleGuard)
+  async create(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('roadmapId', ParseUUIDPipe) roadmapId: string,
+    @Body() createRoadmapItemDto: CreateRoadmapItemDto,
+  ) {
+    return this.roadmapItemsService.create(
+      roadmapId,
+      workspaceId,
+      createRoadmapItemDto,
+    );
+  }
+
   @Get('roadmaps/:roadmapId/items')
   @UseGuards(WorkspaceRoleGuard)
   async findAll(
@@ -42,20 +56,6 @@ export class RoadmapItemsController {
       boardIds: boardId?.split(','),
       statusIds: postStatusId?.split(','),
     });
-  }
-
-  @Post('roadmaps/:roadmapId/items')
-  @UseGuards(WorkspaceRoleGuard)
-  async create(
-    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
-    @Param('roadmapId', ParseUUIDPipe) roadmapId: string,
-    @Body() createRoadmapItemDto: CreateRoadmapItemDto,
-  ) {
-    return this.roadmapItemsService.create(
-      roadmapId,
-      workspaceId,
-      createRoadmapItemDto,
-    );
   }
 
   @Patch('roadmap-items/:itemId')

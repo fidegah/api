@@ -7,18 +7,15 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
-  Req,
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
 
-import type { Request } from 'express';
-
+import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedUser } from '../users/types/auth-user.type';
-import { NotificationsService } from './notifications.service';
-import { MarkAsReadDto } from './dto/mark-as-read.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { MarkAsReadDto } from './dto/mark-as-read.dto';
+import { NotificationsService } from './notifications.service';
 
 @Controller({
   path: 'workspaces/:workspaceId/notifications',
@@ -30,42 +27,36 @@ export class NotificationsController {
 
   @Get()
   findAll(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Query() paginationQuery: PaginationQueryDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
     return this.notificationsService.findAll(
       workspaceId,
-      user.id,
+      userId,
       paginationQuery,
+    );
+  }
+
+  @Post('mark-as-read')
+  markAsRead(
+    @CurrentUserId() userId: string,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Body() markAsReadDto: MarkAsReadDto,
+  ) {
+    return this.notificationsService.markAsRead(
+      workspaceId,
+      userId,
+      markAsReadDto,
     );
   }
 
   @Delete(':id')
   remove(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.notificationsService.remove(id, workspaceId, user.id);
-  }
-
-  @Post('mark-as-read')
-  markAsRead(
-    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
-    @Body() markAsReadDto: MarkAsReadDto,
-    @Req() req: Request,
-  ) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.notificationsService.markAsRead(
-      workspaceId,
-      user.id,
-      markAsReadDto,
-    );
+    return this.notificationsService.remove(id, workspaceId, userId);
   }
 }

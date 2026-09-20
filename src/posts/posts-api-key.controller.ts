@@ -41,6 +41,24 @@ export class PostsApiKeyController {
     return this.postsService.create(workspace.id, userId, createPostDto);
   }
 
+  @Post(':id/tags/:tagId')
+  addTag(
+    @CurrentWorkspace() workspace: Workspace,
+    @Param('id', ParseUUIDPipe) postId: string,
+    @Param('tagId', ParseUUIDPipe) tagId: string,
+  ) {
+    return this.postTagsService.addTagToPost(postId, tagId, workspace.id);
+  }
+
+  @Post(':id/vote')
+  toggleVote(
+    @CurrentWorkspace() workspace: Workspace,
+    @CurrentApiKeyUser() userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.postVotesService.toggleVote(id, userId, workspace.id);
+  }
+
   @Get()
   findAll(
     @CurrentWorkspace() workspace: Workspace,
@@ -48,6 +66,19 @@ export class PostsApiKeyController {
     @Query() query: QueryPostsDto,
   ) {
     return this.postsService.findAll(workspace.id, userId, query);
+  }
+
+  @Get(':id/voters')
+  findVoters(
+    @CurrentWorkspace() workspace: Workspace,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() paginationQuery: PaginationQueryDto,
+  ) {
+    return this.postVotesService.findVotersByPost(
+      id,
+      workspace.id,
+      paginationQuery,
+    );
   }
 
   @Get(':id')
@@ -68,23 +99,6 @@ export class PostsApiKeyController {
     return this.postsService.update(id, workspace.id, updatePostDto);
   }
 
-  @Delete(':id')
-  remove(
-    @CurrentWorkspace() workspace: Workspace,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    return this.postsService.remove(id, workspace.id);
-  }
-
-  @Post(':id/tags/:tagId')
-  addTag(
-    @CurrentWorkspace() workspace: Workspace,
-    @Param('id', ParseUUIDPipe) postId: string,
-    @Param('tagId', ParseUUIDPipe) tagId: string,
-  ) {
-    return this.postTagsService.addTagToPost(postId, tagId, workspace.id);
-  }
-
   @Delete(':id/tags/:tagId')
   removeTag(
     @CurrentWorkspace() workspace: Workspace,
@@ -94,25 +108,11 @@ export class PostsApiKeyController {
     return this.postTagsService.removeTagFromPost(postId, tagId, workspace.id);
   }
 
-  @Post(':id/vote')
-  toggleVote(
-    @CurrentWorkspace() workspace: Workspace,
-    @CurrentApiKeyUser() userId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    return this.postVotesService.toggleVote(id, userId, workspace.id);
-  }
-
-  @Get(':id/voters')
-  findVoters(
+  @Delete(':id')
+  remove(
     @CurrentWorkspace() workspace: Workspace,
     @Param('id', ParseUUIDPipe) id: string,
-    @Query() paginationQuery: PaginationQueryDto,
   ) {
-    return this.postVotesService.findVotersByPost(
-      id,
-      workspace.id,
-      paginationQuery,
-    );
+    return this.postsService.remove(id, workspace.id);
   }
 }

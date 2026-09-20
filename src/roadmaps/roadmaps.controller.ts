@@ -7,52 +7,43 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Req,
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
 
-import type { Request } from 'express';
-
+import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedUser } from '../users/types/auth-user.type';
-import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
 import { RequireRole } from '../common/decorators/require-role.decorator';
-
-import { RoadmapsService } from './roadmaps.service';
+import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
 import { CreateRoadmapDto } from './dto/create-roadmap.dto';
 import { UpdateRoadmapDto } from './dto/update-roadmap.dto';
+import { RoadmapsService } from './roadmaps.service';
 
 @Controller({
   path: 'workspaces/:workspaceId/roadmaps',
   version: VERSION_NEUTRAL,
 })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, WorkspaceRoleGuard)
 export class RoadmapsController {
   constructor(private readonly roadmapsService: RoadmapsService) {}
 
   @Post()
-  @UseGuards(WorkspaceRoleGuard)
-  async create(
+  create(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Body() createRoadmapDto: CreateRoadmapDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.roadmapsService.create(workspaceId, user.id, createRoadmapDto);
+    return this.roadmapsService.create(workspaceId, userId, createRoadmapDto);
   }
 
   @Get()
-  @UseGuards(WorkspaceRoleGuard)
-  async findAll(@Param('workspaceId', ParseUUIDPipe) workspaceId: string) {
+  findAll(@Param('workspaceId', ParseUUIDPipe) workspaceId: string) {
     return this.roadmapsService.findAllByWorkspace(workspaceId);
   }
 
   @Patch(':roadmapId')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async update(
+  update(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('roadmapId', ParseUUIDPipe) roadmapId: string,
     @Body() updateRoadmapDto: UpdateRoadmapDto,
@@ -65,9 +56,8 @@ export class RoadmapsController {
   }
 
   @Delete(':roadmapId')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async remove(
+  remove(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('roadmapId', ParseUUIDPipe) roadmapId: string,
   ) {

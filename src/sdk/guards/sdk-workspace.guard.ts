@@ -6,25 +6,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { Request } from 'express';
 import { DATABASE, type DrizzleDB } from '../../db/database.provider';
-import { workspaces, type Workspace } from '../../db/schema';
-
-export interface SdkRequest extends Request {
-  workspace: Workspace;
-}
+import { workspaces } from '../../db/schema';
+import { SdkSessionRequest } from '../interfaces/sdk-request.interface';
 
 @Injectable()
-export class SdkGuard implements CanActivate {
+export class SdkWorkspaceGuard implements CanActivate {
   constructor(@Inject(DATABASE) private readonly db: DrizzleDB) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<SdkRequest>();
-    const sdkToken = request.headers['x-sdk-token'];
+    const request = context.switchToHttp().getRequest<SdkSessionRequest>();
+    const raw = request.headers['x-sdk-token'];
+    const sdkToken = Array.isArray(raw) ? raw[0] : raw;
 
-    console.log('sdkToken', sdkToken);
-
-    if (!sdkToken || Array.isArray(sdkToken)) {
+    if (!sdkToken?.trim()) {
       throw new UnauthorizedException('SDK token is missing or invalid');
     }
 

@@ -8,30 +8,26 @@ import {
   Patch,
   Post,
   Query,
-  Req,
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
 
-import type { Request } from 'express';
-
+import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedUser } from '../users/types/auth-user.type';
-import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
 import { RequireRole } from '../common/decorators/require-role.decorator';
-
-import { ChangelogsService } from './changelogs.service';
+import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
 import { ChangelogLikesService } from './changelog-likes.service';
-import { CreateChangelogDto } from './dto/create-changelog.dto';
-import { UpdateChangelogDto } from './dto/update-changelog.dto';
-import { QueryChangelogsDto } from './dto/query-changelogs.dto';
 import { ChangelogTagsService } from './changelog-tags.service';
+import { ChangelogsService } from './changelogs.service';
+import { CreateChangelogDto } from './dto/create-changelog.dto';
+import { QueryChangelogsDto } from './dto/query-changelogs.dto';
+import { UpdateChangelogDto } from './dto/update-changelog.dto';
 
 @Controller({
   path: 'workspaces/:workspaceId/changelogs',
   version: VERSION_NEUTRAL,
 })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, WorkspaceRoleGuard)
 export class ChangelogsController {
   constructor(
     private readonly changelogsService: ChangelogsService,
@@ -39,59 +35,49 @@ export class ChangelogsController {
     private readonly changelogTagsService: ChangelogTagsService,
   ) {}
 
-  @Get('tags')
-  async getTags() {
-    return this.changelogTagsService.findAll();
-  }
-
   @Post()
-  @UseGuards(WorkspaceRoleGuard)
-  async create(
+  create(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Body() createChangelogDto: CreateChangelogDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
     return this.changelogsService.create(
       workspaceId,
-      user.id,
+      userId,
       createChangelogDto,
     );
   }
 
   @Get()
-  @UseGuards(WorkspaceRoleGuard)
-  async findAll(
+  findAll(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Query() query: QueryChangelogsDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
+    return this.changelogsService.findAll(workspaceId, userId, query);
+  }
 
-    return this.changelogsService.findAll(workspaceId, user.id, query);
+  @Get('tags')
+  getTags() {
+    return this.changelogTagsService.findAll();
   }
 
   @Get(':id')
-  @UseGuards(WorkspaceRoleGuard)
-  async findOne(
+  findOne(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
     return this.changelogsService.findOneAndIncrementViews(
       id,
       workspaceId,
-      user.id,
+      userId,
     );
   }
 
   @Patch(':id')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async update(
+  update(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateChangelogDto: UpdateChangelogDto,
@@ -100,9 +86,8 @@ export class ChangelogsController {
   }
 
   @Delete(':id')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async remove(
+  remove(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
@@ -110,13 +95,10 @@ export class ChangelogsController {
   }
 
   @Post(':id/like')
-  @UseGuards(WorkspaceRoleGuard)
-  async toggleLike(
+  toggleLike(
+    @CurrentUserId() userId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.changelogLikesService.toggleLike(id, user.id);
+    return this.changelogLikesService.toggleLike(id, userId);
   }
 }

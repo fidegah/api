@@ -1,8 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, sql } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, count, eq, isNotNull, or, sql } from 'drizzle-orm';
 
 import { DATABASE, type DrizzleDB } from '../db/database.provider';
-import { externalUsers, postVotes, posts, users } from '../db/schema';
+import { boards, externalUsers, postVotes, posts, users } from '../db/schema';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { buildPagination } from '../common/utils/build-pagination.util';
 import { PaginatedResult } from '../common/types/pagination.type';
@@ -19,6 +19,8 @@ export interface PostVoter {
 export class PostVotesService {
   constructor(@Inject(DATABASE) private readonly db: DrizzleDB) {}
 
+  // Workspace
+
   async findVotersByPost(
     postId: string,
     workspaceId: string,
@@ -29,6 +31,7 @@ export class PostVotesService {
     const where = and(
       eq(postVotes.postId, postId),
       eq(postVotes.workspaceId, workspaceId),
+      or(isNotNull(postVotes.userId), isNotNull(postVotes.externalUserId)),
     );
 
     const [rawData, [{ total }]] = await Promise.all([
@@ -56,31 +59,23 @@ export class PostVotesService {
       this.db.select({ total: count() }).from(postVotes).where(where),
     ]);
 
-    const data: PostVoter[] = rawData
-      .filter((row) => row.internalUser?.id || row.externalUser?.id)
-      .map((row) => {
-        if (row.externalUser?.id) {
-          return {
+    const data: PostVoter[] = rawData.map((row) =>
+      row.externalUser?.id
+        ? {
             id: row.externalUser.id,
             fullName: row.externalUser.fullName ?? null,
             avatarUrl: row.externalUser.avatarUrl ?? null,
             votedAt: row.votedAt,
             isExternal: true,
-          };
-        }
-
-        if (row.internalUser?.id) {
-          return {
-            id: row.internalUser.id,
-            fullName: row.internalUser.fullName ?? null,
-            avatarUrl: row.internalUser.avatarUrl ?? null,
+          }
+        : {
+            id: row.internalUser!.id,
+            fullName: row.internalUser!.fullName ?? null,
+            avatarUrl: row.internalUser!.avatarUrl ?? null,
             votedAt: row.votedAt,
             isExternal: false,
-          };
-        }
-
-        throw new Error('No valid user found for vote');
-      });
+          },
+    );
 
     return { data, pagination: buildPagination(page, limit, total) };
   }
@@ -90,7 +85,19 @@ export class PostVotesService {
     userId: string,
     workspaceId: string,
   ): Promise<{ voted: boolean; votesCount: number }> {
+    await this.assertPost(postId, workspaceId, false);
     return this.executeToggleVote(postId, workspaceId, { userId });
+  }
+
+  // SDK
+
+  async findVotersByPostSdk(
+    postId: string,
+    workspaceId: string,
+    paginationQuery: PaginationQueryDto,
+  ): Promise<PaginatedResult<PostVoter>> {
+    await this.assertPost(postId, workspaceId, true);
+    return this.findVotersByPost(postId, workspaceId, paginationQuery);
   }
 
   async toggleVoteSdk(
@@ -98,7 +105,39 @@ export class PostVotesService {
     externalUserId: string,
     workspaceId: string,
   ): Promise<{ voted: boolean; votesCount: number }> {
+    await this.assertPost(postId, workspaceId, true);
     return this.executeToggleVote(postId, workspaceId, { externalUserId });
+  }
+
+  // Private helpers
+
+  private async assertPost(
+    postId: string,
+    workspaceId: string,
+    requirePublicBoard: boolean,
+  ): Promise<void> {
+    const post = await this.db.query.posts.findFirst({
+      where: and(eq(posts.id, postId), eq(posts.workspaceId, workspaceId)),
+      columns: { boardId: true },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found in this workspace');
+    }
+
+    if (!requirePublicBoard) return;
+
+    const board = await this.db.query.boards.findFirst({
+      where: and(
+        eq(boards.id, post.boardId),
+        eq(boards.workspaceId, workspaceId),
+        eq(boards.isPrivate, false),
+      ),
+    });
+
+    if (!board) {
+      throw new NotFoundException('Post not found in this workspace');
+    }
   }
 
   private async executeToggleVote(
@@ -106,42 +145,51 @@ export class PostVotesService {
     workspaceId: string,
     voter: { userId?: string; externalUserId?: string },
   ): Promise<{ voted: boolean; votesCount: number }> {
-    const userCondition = voter.userId
-      ? eq(postVotes.userId, voter.userId)
-      : eq(postVotes.externalUserId, voter.externalUserId as string);
+    return this.db.transaction(async (tx) => {
+      const userCondition = voter.userId
+        ? eq(postVotes.userId, voter.userId)
+        : eq(postVotes.externalUserId, voter.externalUserId as string);
 
-    const existing = await this.db.query.postVotes.findFirst({
-      where: and(
-        eq(postVotes.postId, postId),
-        eq(postVotes.workspaceId, workspaceId),
-        userCondition,
-      ),
-    });
+      const existing = await tx.query.postVotes.findFirst({
+        where: and(
+          eq(postVotes.postId, postId),
+          eq(postVotes.workspaceId, workspaceId),
+          userCondition,
+        ),
+      });
 
-    if (existing) {
-      await this.db.delete(postVotes).where(eq(postVotes.id, existing.id));
-      const [post] = await this.db
+      if (existing) {
+        await tx.delete(postVotes).where(eq(postVotes.id, existing.id));
+
+        const [post] = await tx
+          .update(posts)
+          .set({
+            votesCount: sql`GREATEST(${posts.votesCount} - 1, 0)`,
+            lastInteractionAt: new Date(),
+          })
+          .where(and(eq(posts.id, postId), eq(posts.workspaceId, workspaceId)))
+          .returning({ votesCount: posts.votesCount });
+
+        return { voted: false, votesCount: post.votesCount };
+      }
+
+      await tx.insert(postVotes).values({
+        postId,
+        workspaceId,
+        userId: voter.userId ?? null,
+        externalUserId: voter.externalUserId ?? null,
+      });
+
+      const [post] = await tx
         .update(posts)
-        .set({ votesCount: sql`${posts.votesCount} - 1` })
-        .where(eq(posts.id, postId))
+        .set({
+          votesCount: sql`${posts.votesCount} + 1`,
+          lastInteractionAt: new Date(),
+        })
+        .where(and(eq(posts.id, postId), eq(posts.workspaceId, workspaceId)))
         .returning({ votesCount: posts.votesCount });
 
-      return { voted: false, votesCount: post.votesCount };
-    }
-
-    await this.db.insert(postVotes).values({
-      postId,
-      workspaceId,
-      userId: voter.userId ?? null,
-      externalUserId: voter.externalUserId ?? null,
+      return { voted: true, votesCount: post.votesCount };
     });
-
-    const [post] = await this.db
-      .update(posts)
-      .set({ votesCount: sql`${posts.votesCount} + 1` })
-      .where(eq(posts.id, postId))
-      .returning({ votesCount: posts.votesCount });
-
-    return { voted: true, votesCount: post.votesCount };
   }
 }

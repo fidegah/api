@@ -4,28 +4,27 @@ import {
   Delete,
   Get,
   Param,
+  ParseBoolPipe,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
-  Req,
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
-import type { Request } from 'express';
 
+import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedUser } from '../users/types/auth-user.type';
-import { WorkspacesService } from './workspaces.service';
-import { WorkspaceUsersService } from './workspace-users.service';
-import { CreateWorkspaceDto } from './dto/create-workspace.dto';
-import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
-import { UpdateAllowedDomainsDto } from './dto/update-allowed-domains.dto';
+import { RequireRole } from '../common/decorators/require-role.decorator';
 import { Subdomain } from '../common/decorators/subdomain.decorator';
 import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
-import { RequireRole } from '../common/decorators/require-role.decorator';
-import { QueryWorkspaceUsersDto } from './dto/query-workspace-users.dto';
+import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { QueryUserActivityDto } from './dto/query-user-activity.dto';
+import { QueryWorkspaceUsersDto } from './dto/query-workspace-users.dto';
+import { UpdateAllowedDomainsDto } from './dto/update-allowed-domains.dto';
+import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import { WorkspaceUsersService } from './workspace-users.service';
+import { WorkspacesService } from './workspaces.service';
 
 @Controller({ path: 'workspaces', version: VERSION_NEUTRAL })
 @UseGuards(JwtAuthGuard)
@@ -36,22 +35,18 @@ export class WorkspacesController {
   ) {}
 
   @Post()
-  create(@Body() dto: CreateWorkspaceDto, @Req() req: Request) {
-    const user = req.user as AuthenticatedUser;
-    return this.workspacesService.create(user.id, dto);
+  create(@CurrentUserId() userId: string, @Body() dto: CreateWorkspaceDto) {
+    return this.workspacesService.create(userId, dto);
   }
 
   @Get()
-  findAll(@Req() req: Request) {
-    const user = req.user as AuthenticatedUser;
-    return this.workspacesService.findAllByUser(user.id);
+  findAll(@CurrentUserId() userId: string) {
+    return this.workspacesService.findAllByUser(userId);
   }
 
   @Get('current')
-  findCurrent(@Subdomain() subdomain: string, @Req() req: Request) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.workspacesService.findBySubdomain(subdomain, user.id);
+  findCurrent(@CurrentUserId() userId: string, @Subdomain() subdomain: string) {
+    return this.workspacesService.findBySubdomain(subdomain, userId);
   }
 
   @Get(':id')
@@ -99,7 +94,7 @@ export class WorkspacesController {
   @RequireRole('owner')
   toggleSecureIdentify(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('enforce') enforce: boolean,
+    @Body('enforce', ParseBoolPipe) enforce: boolean,
   ) {
     return this.workspacesService.toggleSecureIdentifyByWorkspaceId(
       id,
@@ -109,9 +104,11 @@ export class WorkspacesController {
 
   @Get(':id/me')
   @UseGuards(WorkspaceRoleGuard)
-  getMyMembership(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
-    const user = req.user as AuthenticatedUser;
-    return this.workspaceUsersService.getMembership(id, user.id);
+  getMyMembership(
+    @CurrentUserId() userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.workspaceUsersService.getMembership(id, userId);
   }
 
   // --- Internal Users Endpoints ---

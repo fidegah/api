@@ -1,8 +1,9 @@
-import { pgTable, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { users } from './users.schema';
 import { posts } from './posts.schema';
 import { workspaces } from './workspaces.schema';
 import { externalUsers } from './external-users.schema';
+import { sql } from 'drizzle-orm';
 
 export const postVotes = pgTable(
   'post_votes',
@@ -26,10 +27,12 @@ export const postVotes = pgTable(
       .references(() => workspaces.id, { onDelete: 'cascade' }),
   },
   (table) => [
-    {
-      uniqueVote: unique().on(table.postId, table.userId),
-      uniqueExternalUserVote: unique().on(table.postId, table.externalUserId),
-    },
+    uniqueIndex('post_votes_post_user_unique')
+      .on(table.postId, table.userId)
+      .where(sql`${table.userId} IS NOT NULL`),
+    uniqueIndex('post_votes_post_external_user_unique')
+      .on(table.postId, table.externalUserId)
+      .where(sql`${table.externalUserId} IS NOT NULL`),
   ],
 );
 

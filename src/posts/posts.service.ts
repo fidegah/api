@@ -5,6 +5,7 @@ import { DATABASE, type DrizzleDB } from '../db/database.provider';
 import {
   boards,
   Post,
+  postCategories,
   posts,
   postStatuses,
   postTags,
@@ -31,122 +32,15 @@ export class PostsService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  private async enrichPosts(
-    postsList: Post[],
-    userId: string | null,
-    externalUserId: string | null = null,
-  ): Promise<PostWithVoteStatus[]> {
-    if (postsList.length === 0) return [];
-
-    const postIds = postsList.map((p) => p.id);
-
-    const userIds = [
-      ...new Set(
-        postsList
-          .map((p) => p.userId)
-          .filter((id): id is string => id !== null),
-      ),
-    ];
-
-    let votesPromise: Promise<{ postId: string }[]> = Promise.resolve([]);
-
-    if (userId) {
-      votesPromise = this.db.query.postVotes.findMany({
-        where: and(
-          inArray(postVotes.postId, postIds),
-          eq(postVotes.userId, userId),
-        ),
-        columns: { postId: true },
-      });
-    } else if (externalUserId) {
-      votesPromise = this.db.query.postVotes.findMany({
-        where: and(
-          inArray(postVotes.postId, postIds),
-          eq(postVotes.externalUserId, externalUserId),
-        ),
-        columns: { postId: true },
-      });
-    }
-
-    const creatorsPromise: Promise<PostCreator[]> =
-      userIds.length > 0
-        ? this.db
-            .select({
-              id: users.id,
-              fullName: users.fullName,
-              avatarUrl: users.avatarUrl,
-            })
-            .from(users)
-            .where(inArray(users.id, userIds))
-        : Promise.resolve([]);
-
-    const [votes, creators] = await Promise.all([
-      votesPromise,
-      creatorsPromise,
-    ]);
-
-    const votedIds = new Set(votes.map((v) => v.postId));
-
-    const creatorMap = new Map<string, PostCreator>(
-      creators.map((c) => [c.id, c] as [string, PostCreator]),
-    );
-
-    return postsList.map((post) => ({
-      ...post,
-      isVoted: votedIds.has(post.id),
-      creator: post.userId ? (creatorMap.get(post.userId) ?? null) : null,
-    }));
-  }
-
-  async createSdk(
-    workspaceId: string,
-    externalUserId: string,
-    createPostDto: CreatePostDto,
-  ): Promise<Post> {
-    let statusId = createPostDto.statusId;
-
-    if (!statusId) {
-      const defaultStatus = await this.db.query.postStatuses.findFirst({
-        where: eq(postStatuses.value, 'open'),
-      });
-
-      if (!defaultStatus) {
-        throw new NotFoundException('Default post status (open) not found');
-      }
-      statusId = defaultStatus.id;
-    }
-
-    const [newPost] = await this.db
-      .insert(posts)
-      .values({
-        ...createPostDto,
-        workspaceId,
-        externalUserId,
-        statusId,
-      })
-      .returning();
-
-    return newPost;
-  }
+  // Workspace
 
   async create(
     workspaceId: string,
     userId: string,
     createPostDto: CreatePostDto,
   ): Promise<Post> {
-    let statusId = createPostDto.statusId;
-
-    if (!statusId) {
-      const defaultStatus = await this.db.query.postStatuses.findFirst({
-        where: eq(postStatuses.value, 'open'),
-      });
-
-      if (!defaultStatus) {
-        throw new NotFoundException('Default post status (open) not found');
-      }
-
-      statusId = defaultStatus.id;
-    }
+    const statusId =
+      createPostDto.statusId ?? (await this.resolveDefaultStatusId());
 
     const [newPost] = await this.db
       .insert(posts)
@@ -175,8 +69,8 @@ export class PostsService {
       conditions.push(ilike(posts.title, `%${query.search}%`));
     }
 
-    if (query.boardId && query.boardId.length > 0) {
-      conditions.push(inArray(posts.boardId, query.boardId));
+    if (query.statusId && query.statusId.length > 0) {
+      conditions.push(inArray(posts.statusId, query.statusId));
     }
 
     if (query.statusValue && query.statusValue.length > 0) {
@@ -184,10 +78,6 @@ export class PostsService {
         where: inArray(postStatuses.value, query.statusValue),
         columns: { id: true },
       });
-
-      if (query.statusId && query.statusId.length > 0) {
-        conditions.push(inArray(posts.statusId, query.statusId));
-      }
 
       const statusIds = matchedStatuses.map((s) => s.id);
 
@@ -267,52 +157,6 @@ export class PostsService {
     return enriched;
   }
 
-  async findAllSdkPublic(
-    workspaceId: string,
-    externalUserId: string | null,
-    query: QueryPostsDto,
-  ): Promise<PaginatedResult<PostWithVoteStatus>> {
-    const publicBoards = await this.db.query.boards.findMany({
-      where: and(
-        eq(boards.workspaceId, workspaceId),
-        eq(boards.isPrivate, false),
-      ),
-      columns: { id: true },
-    });
-
-    const publicBoardIds = publicBoards.map((b) => b.id);
-
-    if (publicBoardIds.length === 0) {
-      return {
-        data: [],
-        pagination: buildPagination(query.page, query.limit, 0),
-      };
-    }
-
-    const targetBoardIds =
-      query.boardId && query.boardId.length > 0
-        ? query.boardId.filter((id) => publicBoardIds.includes(id))
-        : publicBoardIds;
-
-    if (targetBoardIds.length === 0) {
-      return {
-        data: [],
-        pagination: buildPagination(query.page, query.limit, 0),
-      };
-    }
-
-    return this.findAll(
-      workspaceId,
-      null,
-      {
-        ...query,
-        boardId: targetBoardIds,
-        offset: query.offset,
-      },
-      externalUserId,
-    );
-  }
-
   async update(
     id: string,
     workspaceId: string,
@@ -344,27 +188,6 @@ export class PostsService {
     }
 
     return updated;
-  }
-
-  private async notifyOnStatusChange(
-    workspaceId: string,
-    post: Post,
-    newStatusId: string,
-  ): Promise<void> {
-    if (!post.userId) return;
-
-    const newStatus = await this.db.query.postStatuses.findFirst({
-      where: eq(postStatuses.id, newStatusId),
-    });
-
-    if (!newStatus) return;
-
-    await this.notificationsService.create({
-      workspaceId,
-      userId: post.userId,
-      title: 'وضعیت پست شما به‌روزرسانی شد',
-      description: `وضعیت پست «${post.title}» به «${newStatus.label}» تغییر کرد.`,
-    });
   }
 
   async remove(id: string, workspaceId: string): Promise<{ message: string }> {
@@ -446,5 +269,223 @@ export class PostsService {
     }
 
     return post;
+  }
+
+  // SDK
+
+  async createSdk(
+    workspaceId: string,
+    externalUserId: string,
+    createPostDto: CreatePostDto,
+  ): Promise<Post> {
+    await this.assertPublicBoard(createPostDto.boardId, workspaceId);
+
+    if (createPostDto.categoryId) {
+      const category = await this.db.query.postCategories.findFirst({
+        where: and(
+          eq(postCategories.id, createPostDto.categoryId),
+          eq(postCategories.workspaceId, workspaceId),
+          eq(postCategories.boardId, createPostDto.boardId),
+        ),
+      });
+
+      if (!category) {
+        throw new NotFoundException('Category not found in this board');
+      }
+    }
+
+    const statusId = await this.resolveDefaultStatusId();
+
+    const [newPost] = await this.db
+      .insert(posts)
+      .values({
+        title: createPostDto.title,
+        description: createPostDto.description,
+        boardId: createPostDto.boardId,
+        categoryId: createPostDto.categoryId ?? null,
+        workspaceId,
+        externalUserId,
+        statusId,
+        visibility: 'public',
+        lastInteractionAt: new Date(),
+      })
+      .returning();
+
+    return newPost;
+  }
+
+  async findAllSdkPublic(
+    workspaceId: string,
+    externalUserId: string | null,
+    query: QueryPostsDto,
+  ): Promise<PaginatedResult<PostWithVoteStatus>> {
+    const publicBoards = await this.db.query.boards.findMany({
+      where: and(
+        eq(boards.workspaceId, workspaceId),
+        eq(boards.isPrivate, false),
+      ),
+      columns: { id: true },
+    });
+
+    const publicBoardIds = publicBoards.map((b) => b.id);
+
+    if (publicBoardIds.length === 0) {
+      return {
+        data: [],
+        pagination: buildPagination(query.page, query.limit, 0),
+      };
+    }
+
+    const targetBoardIds =
+      query.boardId && query.boardId.length > 0
+        ? query.boardId.filter((id) => publicBoardIds.includes(id))
+        : publicBoardIds;
+
+    if (targetBoardIds.length === 0) {
+      return {
+        data: [],
+        pagination: buildPagination(query.page, query.limit, 0),
+      };
+    }
+
+    return this.findAll(
+      workspaceId,
+      null,
+      {
+        ...query,
+        boardId: targetBoardIds,
+        offset: query.offset,
+      },
+      externalUserId,
+    );
+  }
+
+  async findOneSdkPublic(
+    id: string,
+    workspaceId: string,
+    externalUserId: string | null,
+  ): Promise<PostWithVoteStatus> {
+    const post = await this.findOne(id, workspaceId, null, externalUserId);
+    await this.assertPublicBoard(post.boardId, workspaceId);
+    return post;
+  }
+
+  // Private helpers
+
+  private async enrichPosts(
+    postsList: Post[],
+    userId: string | null,
+    externalUserId: string | null = null,
+  ): Promise<PostWithVoteStatus[]> {
+    if (postsList.length === 0) return [];
+
+    const postIds = postsList.map((p) => p.id);
+
+    const userIds = [
+      ...new Set(
+        postsList
+          .map((p) => p.userId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+
+    let votesPromise: Promise<{ postId: string }[]> = Promise.resolve([]);
+
+    if (userId) {
+      votesPromise = this.db.query.postVotes.findMany({
+        where: and(
+          inArray(postVotes.postId, postIds),
+          eq(postVotes.userId, userId),
+        ),
+        columns: { postId: true },
+      });
+    } else if (externalUserId) {
+      votesPromise = this.db.query.postVotes.findMany({
+        where: and(
+          inArray(postVotes.postId, postIds),
+          eq(postVotes.externalUserId, externalUserId),
+        ),
+        columns: { postId: true },
+      });
+    }
+
+    const creatorsPromise: Promise<PostCreator[]> =
+      userIds.length > 0
+        ? this.db
+            .select({
+              id: users.id,
+              fullName: users.fullName,
+              avatarUrl: users.avatarUrl,
+            })
+            .from(users)
+            .where(inArray(users.id, userIds))
+        : Promise.resolve([]);
+
+    const [votes, creators] = await Promise.all([
+      votesPromise,
+      creatorsPromise,
+    ]);
+
+    const votedIds = new Set(votes.map((v) => v.postId));
+
+    const creatorMap = new Map<string, PostCreator>(
+      creators.map((c) => [c.id, c] as [string, PostCreator]),
+    );
+
+    return postsList.map((post) => ({
+      ...post,
+      isVoted: votedIds.has(post.id),
+      creator: post.userId ? (creatorMap.get(post.userId) ?? null) : null,
+    }));
+  }
+
+  private async assertPublicBoard(
+    boardId: string,
+    workspaceId: string,
+  ): Promise<void> {
+    const board = await this.db.query.boards.findFirst({
+      where: and(
+        eq(boards.id, boardId),
+        eq(boards.workspaceId, workspaceId),
+        eq(boards.isPrivate, false),
+      ),
+    });
+
+    if (!board) {
+      throw new NotFoundException('Board not found in this workspace');
+    }
+  }
+
+  private async resolveDefaultStatusId(): Promise<string> {
+    const defaultStatus = await this.db.query.postStatuses.findFirst({
+      where: and(eq(postStatuses.value, 'open')),
+    });
+
+    if (!defaultStatus) {
+      throw new NotFoundException('Default post status (open) not found');
+    }
+
+    return defaultStatus.id;
+  }
+
+  private async notifyOnStatusChange(
+    workspaceId: string,
+    post: Post,
+    newStatusId: string,
+  ): Promise<void> {
+    if (!post.userId) return;
+
+    const newStatus = await this.db.query.postStatuses.findFirst({
+      where: eq(postStatuses.id, newStatusId),
+    });
+
+    if (!newStatus) return;
+
+    await this.notificationsService.create({
+      workspaceId,
+      userId: post.userId,
+      title: 'وضعیت پست شما به‌روزرسانی شد',
+      description: `وضعیت پست «${post.title}» به «${newStatus.label}» تغییر کرد.`,
+    });
   }
 }

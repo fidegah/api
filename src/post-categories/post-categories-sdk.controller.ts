@@ -12,11 +12,11 @@ import { Throttle } from '@nestjs/throttler';
 import { PostCategoriesService } from './post-categories.service';
 import { QueryPostCategoriesDto } from './dto/query-post-categories.dto';
 import type { Workspace } from '../db/schema';
-import { SdkGuard } from '../sdk/guards/sdk.guard';
 import { CurrentSdkWorkspace } from '../sdk/decorators/sdk-workspace.decorator';
+import { SdkWorkspaceGuard } from '../sdk/guards/sdk-workspace.guard';
 
 @Controller({ path: 'sdk/post-categories', version: VERSION_NEUTRAL })
-@UseGuards(SdkGuard)
+@UseGuards(SdkWorkspaceGuard)
 @Throttle({ default: { limit: 120, ttl: 60_000 } })
 export class PostCategoriesSdkController {
   constructor(private readonly postCategoriesService: PostCategoriesService) {}
@@ -26,14 +26,17 @@ export class PostCategoriesSdkController {
     @CurrentSdkWorkspace() workspace: Workspace,
     @Query() query: QueryPostCategoriesDto,
   ) {
-    return this.postCategoriesService.findAllByWorkspace(workspace.id, query);
+    return this.postCategoriesService.findAllPublicByWorkspace(
+      workspace.id,
+      query,
+    );
   }
 
   @Get(':id')
-  async findOne(
+  findOne(
     @CurrentSdkWorkspace() workspace: Workspace,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.postCategoriesService.findOne(id, workspace.id);
+    return this.postCategoriesService.findOnePublic(id, workspace.id);
   }
 }

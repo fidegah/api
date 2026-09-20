@@ -6,6 +6,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
 import { CorsOptions } from '@nestjs/common/internal';
 import { IncomingMessage } from 'http';
 import { ConfigService } from '@nestjs/config';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -87,6 +88,8 @@ async function bootstrap(): Promise<void> {
       callback(null, corsOptions);
     },
   );
+
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   await app.listen(port, '0.0.0.0');
 }

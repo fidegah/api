@@ -21,6 +21,11 @@ export class WorkspaceApiKeyController {
     };
   }
 
+  @Get('credentials')
+  getCredentials(@CurrentWorkspace() workspace: schema.Workspace) {
+    return this.workspacesService.getCredentialsByWorkspaceId(workspace.id);
+  }
+
   @Patch('current')
   updateWorkspace(
     @CurrentWorkspace() workspace: schema.Workspace,
@@ -30,11 +35,6 @@ export class WorkspaceApiKeyController {
       workspace.id,
       updateWorkspaceDto,
     );
-  }
-
-  @Get('credentials')
-  getCredentials(@CurrentWorkspace() workspace: schema.Workspace) {
-    return this.workspacesService.getCredentialsByWorkspaceId(workspace.id);
   }
 
   @Patch('allowed-domains')

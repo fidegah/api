@@ -16,7 +16,7 @@
     showButton: scriptTag.dataset.button === 'true',
   };
 
-  let sessionId = localStorage.getItem('session_id');
+  let sessionId = localStorage.getItem('sessionId');
   if (!sessionId) {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       sessionId = `fs_external_${crypto.randomUUID()}`;
@@ -33,7 +33,7 @@
       sessionId = `fs_external_${cryptoFallback}_${Date.now().toString(36)}`;
     }
     sessionId = sessionId.substring(0, 255);
-    localStorage.setItem('session_id', sessionId);
+    localStorage.setItem('sessionId', sessionId);
   }
 
   const deviceInfo = {
@@ -41,14 +41,24 @@
     currentUrl: globalThis.location.href,
   };
 
-  const isDev =
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1';
   const APP_DOMAIN = 'fidegah.ir';
+  const IS_DEV =
+    globalThis.location.hostname === 'localhost' ||
+    globalThis.location.hostname === '127.0.0.1';
 
-  const hostUrl = isDev ? 'http://localhost:3000' : `https://api.${APP_DOMAIN}`;
-  const apiUrl = `${hostUrl}/v1/sdk`;
-  const logoUrl = `${hostUrl}/static/images/fidegah_logo_text.webp`;
+  const URLS = {
+    host: IS_DEV ? 'http://localhost:3000' : `https://api.${APP_DOMAIN}`,
+    widgetDomain: IS_DEV ? 'lvh.me:5173' : APP_DOMAIN,
+    get api() {
+      return `${this.host}/v1/sdk`;
+    },
+    get logo() {
+      return `${this.host}/static/images/fidegah_logo_text.webp`;
+    },
+  };
+
+  const apiUrl = URLS.api;
+  const logoUrl = URLS.logo;
 
   let workspaceSubdomain = '';
 
@@ -226,10 +236,10 @@
         isMobile,
       );
 
-    console.log('workspaceSubdomain:', workspaceSubdomain);
-
     const transitionStyle = `transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;`;
-    const widgetUrl = `https://${workspaceSubdomain}.lvh.me:5173/sdk/widget/feedback/board?session_id=${sessionId}&theme=${activeTheme}&sdkToken=${sdkToken}`;
+
+    const widgetBaseUrl = `https://${workspaceSubdomain}.${URLS.widgetDomain}`;
+    const widgetUrl = `${widgetBaseUrl}/sdk/widget/feedback/board?sessionId=${sessionId}&theme=${activeTheme}&sdkToken=${sdkToken}`;
 
     if (!document.getElementById('fidegah-skeleton-style')) {
       const style = document.createElement('style');
@@ -437,11 +447,11 @@
           sessionId: sessionId,
           user: {
             id: String(userData.id),
-            fullName: userData.name || userData.fullName || userData.full_name,
+            fullName: userData.name || userData.fullName,
             email: userData.email,
-            avatarUrl: userData.avatar || userData.avatarUrl,
+            avatarUrl: userData.avatarUrl,
           },
-          verificationToken: userData.token || userData.verificationToken,
+          verificationToken: userData.verificationToken,
         }),
       }).catch((err) => console.error('Fidegah SDK Identify Error:', err));
     },

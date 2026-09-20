@@ -8,29 +8,25 @@ import {
   Patch,
   Post,
   Query,
-  Req,
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
 
-import type { Request } from 'express';
-
+import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedUser } from '../users/types/auth-user.type';
-import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
 import { RequireRole } from '../common/decorators/require-role.decorator';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
-
-import { PostCommentsService } from './post-comments.service';
+import { WorkspaceRoleGuard } from '../common/guards/workspace-role.guard';
+import { CommentLikesService } from './comment-likes.service';
 import { CreatePostCommentDto } from './dto/create-post-comment.dto';
 import { UpdatePostCommentDto } from './dto/update-post-comment.dto';
-import { CommentLikesService } from './comment-likes.service';
+import { PostCommentsService } from './post-comments.service';
 
 @Controller({
   path: 'workspaces/:workspaceId/posts/:postId/comments',
   version: VERSION_NEUTRAL,
 })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, WorkspaceRoleGuard)
 export class PostCommentsController {
   constructor(
     private readonly postCommentsService: PostCommentsService,
@@ -38,81 +34,77 @@ export class PostCommentsController {
   ) {}
 
   @Post()
-  @UseGuards(WorkspaceRoleGuard)
-  async create(
+  create(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('postId', ParseUUIDPipe) postId: string,
     @Body() createPostCommentDto: CreatePostCommentDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
     return this.postCommentsService.create(
       postId,
       workspaceId,
-      user.id,
+      userId,
       createPostCommentDto,
     );
   }
 
   @Get()
-  @UseGuards(WorkspaceRoleGuard)
-  async findAll(
+  findAll(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('postId', ParseUUIDPipe) postId: string,
     @Query() paginationQuery: PaginationQueryDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
     return this.postCommentsService.findAllByPost(
       postId,
       workspaceId,
-      user.id,
+      userId,
       paginationQuery,
     );
   }
 
+  @Get('summary')
+  @RequireRole('owner', 'admin')
+  summarizeComments(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('postId', ParseUUIDPipe) postId: string,
+  ) {
+    return this.postCommentsService.summarizeComments(postId, workspaceId);
+  }
+
   @Get(':id/replies')
-  @UseGuards(WorkspaceRoleGuard)
-  async findReplies(
+  findReplies(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Query() paginationQuery: PaginationQueryDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
     return this.postCommentsService.findReplies(
       id,
       workspaceId,
-      user.id,
+      userId,
       paginationQuery,
     );
   }
 
   @Patch(':id')
-  @UseGuards(WorkspaceRoleGuard)
-  async update(
+  update(
+    @CurrentUserId() userId: string,
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updatePostCommentDto: UpdatePostCommentDto,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
     return this.postCommentsService.update(
       id,
       workspaceId,
-      user.id,
+      userId,
       updatePostCommentDto,
     );
   }
 
   @Delete(':id')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async remove(
+  remove(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
@@ -120,9 +112,8 @@ export class PostCommentsController {
   }
 
   @Post(':id/pin')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async togglePin(
+  togglePin(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
@@ -130,33 +121,20 @@ export class PostCommentsController {
   }
 
   @Post(':id/spam')
-  @UseGuards(WorkspaceRoleGuard)
   @RequireRole('owner', 'admin')
-  async toggleSpam(
+  toggleSpam(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.postCommentsService.toggleSpam(id, workspaceId);
   }
 
-  @Get('summary')
-  @UseGuards(WorkspaceRoleGuard)
-  @RequireRole('owner', 'admin')
-  async summarizeComments(
-    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
-    @Param('postId', ParseUUIDPipe) postId: string,
-  ) {
-    return this.postCommentsService.summarizeComments(postId, workspaceId);
-  }
-
   @Post(':id/like')
-  @UseGuards(WorkspaceRoleGuard)
-  async toggleLike(
+  toggleLike(
+    @CurrentUserId() userId: string,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request,
   ) {
-    const user = req.user as AuthenticatedUser;
-
-    return this.commentLikesService.toggleLike(id, user.id);
+    return this.commentLikesService.toggleLike(id, workspaceId, userId);
   }
 }

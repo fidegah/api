@@ -15,6 +15,8 @@ import { BoardErrorCode } from './constants/board-error-codes.constant';
 export class BoardsService {
   constructor(@Inject(DATABASE) private readonly db: DrizzleDB) {}
 
+  // Workspace
+
   async create(
     workspaceId: string,
     userId: string,
@@ -40,10 +42,10 @@ export class BoardsService {
     const [newBoard] = await this.db
       .insert(boards)
       .values({
-        workspaceId,
-        userId,
         ...createBoardDto,
         title: createBoardDto.title.trim(),
+        workspaceId,
+        userId,
         isDefault: !hasAnyBoard,
       })
       .returning();
@@ -163,11 +165,21 @@ export class BoardsService {
       ),
     });
 
-    if (!board) {
-      throw new NotFoundException('Default board not found');
+    if (board) return board;
+
+    const fallback = await this.db.query.boards.findFirst({
+      where: and(
+        eq(boards.workspaceId, workspaceId),
+        eq(boards.isPrivate, false),
+      ),
+      orderBy: (b, { asc }) => [asc(b.createdAt)],
+    });
+
+    if (!fallback) {
+      throw new NotFoundException('No public board found');
     }
 
-    return board;
+    return fallback;
   }
 
   async findPublicOne(id: string, workspaceId: string) {

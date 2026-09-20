@@ -26,9 +26,10 @@ export const externalUsers = pgTable(
       .notNull(),
   },
   (table) => [
-    {
-      uniqueExternal: unique().on(table.workspaceId, table.externalId),
-    },
+    unique('external_users_workspace_external_unique').on(
+      table.workspaceId,
+      table.externalId,
+    ),
   ],
 );
 

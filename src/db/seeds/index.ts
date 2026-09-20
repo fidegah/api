@@ -4,7 +4,7 @@ import { drizzle, NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import * as schema from '../schema';
 import { setupNeonConfig } from '../neon-config';
 import { seedPostStatuses } from './post-statuses.seed';
-import { seedChangelogTags } from './seed-changelog-tags';
+import { seedChangelogTags } from './changelog-tags.seed';
 
 export type SeedDatabase = NeonHttpDatabase<typeof schema>;
 

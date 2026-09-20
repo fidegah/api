@@ -11,16 +11,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
-import { ApiKeyGuard } from '../api-keys/guards/api-key.guard';
-import { CurrentWorkspace } from '../api-keys/decorators/current-workspace.decorator';
 import { CurrentApiKeyUser } from '../api-keys/decorators/current-api-key-user.decorator';
+import { CurrentWorkspace } from '../api-keys/decorators/current-workspace.decorator';
+import { ApiKeyGuard } from '../api-keys/guards/api-key.guard';
 import * as schema from '../db/schema';
-import { ChangelogsService } from './changelogs.service';
 import { ChangelogLikesService } from './changelog-likes.service';
-import { CreateChangelogDto } from './dto/create-changelog.dto';
-import { UpdateChangelogDto } from './dto/update-changelog.dto';
 import { ChangelogTagsService } from './changelog-tags.service';
+import { ChangelogsService } from './changelogs.service';
+import { CreateChangelogDto } from './dto/create-changelog.dto';
 import { QueryChangelogsDto } from './dto/query-changelogs.dto';
+import { UpdateChangelogDto } from './dto/update-changelog.dto';
 
 @Controller({ path: 'changelogs', version: '1' })
 @UseGuards(ApiKeyGuard)
@@ -30,11 +30,6 @@ export class ChangelogsApiKeyController {
     private readonly changelogLikesService: ChangelogLikesService,
     private readonly changelogTagsService: ChangelogTagsService,
   ) {}
-
-  @Get('tags')
-  async getTags() {
-    return this.changelogTagsService.findAll();
-  }
 
   @Post()
   create(
@@ -56,6 +51,11 @@ export class ChangelogsApiKeyController {
     @Query() query: QueryChangelogsDto,
   ) {
     return this.changelogsService.findAll(workspace.id, userId, query);
+  }
+
+  @Get('tags')
+  getTags() {
+    return this.changelogTagsService.findAll();
   }
 
   @Get(':id')

@@ -26,7 +26,10 @@ export class PostCategoriesPortalController {
     @CurrentPortalWorkspace() workspace: Workspace,
     @Query() query: QueryPostCategoriesDto,
   ) {
-    return this.postCategoriesService.findAllByWorkspace(workspace.id, query);
+    return this.postCategoriesService.findAllPublicByWorkspace(
+      workspace.id,
+      query,
+    );
   }
 
   @Get(':id')
